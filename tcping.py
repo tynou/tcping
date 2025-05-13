@@ -41,4 +41,7 @@ if __name__ == '__main__':
     src_port = get_free_port()
 
     ping = Ping(src_ip, src_port, dst_ip, args.port, args.timeout)
-    ping.start(args.count, args.interval)
+    try:
+        ping.start(args.count, args.interval)
+    except KeyboardInterrupt:
+        ping.print_statistics()

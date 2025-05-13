@@ -29,6 +29,9 @@ class Ping:
         self.dst_port = dst_port
         self.timeout = timeout
         self.stats = Stats()
+    
+    def print_statistics(self):
+        print(self.stats.results())
 
     def start(self, count, interval):
         counter = itertools.count(1)
@@ -39,8 +42,8 @@ class Ping:
             count -= 1
             if interval - response_time > 0:
                 time.sleep(interval - response_time)
-
-        print(self.stats.results())
+        
+        self.print_statistics()
 
     def ping(self, seq):
         self.tcp.settimeout(self.timeout)
