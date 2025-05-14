@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import socket
 import argparse
+import sys
 from ping import Ping
 
 
@@ -23,11 +24,13 @@ def get_free_port():
 
 def parse_args():
     parser = argparse.ArgumentParser()
+
     parser.add_argument('host', type=str, help='host to ping')
     parser.add_argument('-p', '--port', dest='port', type=int, required=False, default=80)
     parser.add_argument('-c', '--count', dest='count', type=int, required=False, default=float('Inf'))
-    parser.add_argument('-t', '--timeout', dest='timeout', type=int, required=False, default=5)
-    parser.add_argument('-i', '--interval', type=float, required=False, default=1)
+    parser.add_argument('-t', '--timeout', dest='timeout', type=float, required=False, default=5.0)
+    parser.add_argument('-i', '--interval', type=float, required=False, default=1.0)
+
     args = parser.parse_args()
 
     return args
@@ -36,8 +39,26 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    dst_ip = socket.gethostbyname(args.host)
-    src_ip = get_ip()
+    try:
+        socket.inet_aton(args.host)
+        is_url = False
+    except socket.error:
+        is_url = True
+
+    if is_url:
+        try:
+            dst_ip = socket.gethostbyname(args.host)
+        except socket.error:
+            print(f"Хоста '{args.host}' не существует")
+            sys.exit()
+    else:
+        dst_ip = args.host
+    
+    if dst_ip == '127.0.0.1':
+        src_ip = '127.0.0.1'
+    else:
+        src_ip = get_ip()
+    
     src_port = get_free_port()
 
     ping = Ping(src_ip, src_port, dst_ip, args.port, args.timeout)

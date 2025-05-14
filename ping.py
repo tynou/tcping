@@ -38,7 +38,14 @@ class Ping:
         while count:
             code, response_time = self.ping(next(counter))
             self.stats.add(code, response_time)
-            print(f"Ping {self.dst_ip}:{self.dst_port} - {code} - time={round(response_time * 1000, 3)}ms")
+            # print(f"Ping {self.dst_ip}:{self.dst_port} | {code} | time={round(response_time * 1000, 3)}ms")
+            match code:
+                case Response.PORT_OPEN:
+                    print(f"{self.dst_ip}:{self.dst_port} | Порт отрыт | Ответ получен за {round(response_time * 1000, 3)}мс")
+                case Response.PORT_CLOSED:
+                    print(f"{self.dst_ip}:{self.dst_port} | Порт закрыт")
+                case Response.TIMEOUT:
+                    print(f"{self.dst_ip}:{self.dst_port} | Нет ответа | Время истекло")
             count -= 1
             if interval - response_time > 0:
                 time.sleep(interval - response_time)
@@ -49,29 +56,29 @@ class Ping:
         self.tcp.settimeout(self.timeout)
         tcp_packet = self.build(seq, 2)
 
-        start_time = time.time()
-        self.tcp.sendto(tcp_packet, (self.dst_ip, self.dst_port))
-        result, response_time = self.parse_packets(start_time, seq)
-        return result, response_time
-    
-    def parse_packets(self, start_time, seq):
-        new_timeout = self.timeout
-        data = self.tcp.recvfrom(16384)[0]  # Чтение ответа
-        response_time = time.time() - start_time
+        try:
+            self.tcp.sendto(tcp_packet, (self.dst_ip, self.dst_port))
+            start_time = time.time()
 
-        # Разбор TCP-заголовка
-        tcp_header = struct.unpack('!BBBBIIBB', data[20:34])
-        ack_seq = tcp_header[5]  # Номер подтверждения (ACK)
-        flags = tcp_header[7]    # Флаги TCP
+            while True:
+                response = self.tcp.recvfrom(16384)  # Чтение ответа
+                if not response:
+                    continue
+                data, _ = response
+                response_time = time.time() - start_time
 
-        if ack_seq == seq + 1:  # Проверка ACK
-            if flags == 0x12:    # SYN-ACK (порт открыт)
-                self.tcp.sendto(self.build(seq, 4), (self.dst_ip, self.dst_port))  # RST (закрытие)
-                return Response.PORT_OPEN, response_time
-            elif flags == 0x04:   # RST (порт закрыт)
-                return Response.PORT_CLOSED, response_time
-        new_timeout = self.timeout - response_time
-        if new_timeout < 0:
+                # Разбор TCP-заголовка
+                tcp_header = struct.unpack('!BBBBIIBB', data[20:34])
+                ack_seq = tcp_header[5]  # Номер подтверждения (ACK)
+                flags = tcp_header[7]    # Флаги TCP
+
+                if ack_seq == seq + 1:  # Проверка ACK
+                    if flags == 0x12:    # SYN-ACK (порт открыт)
+                        self.tcp.sendto(self.build(seq, 4), (self.dst_ip, self.dst_port))  # RST (закрытие)
+                        return Response.PORT_OPEN, response_time
+                    elif flags == 0x04 or flags == 0x14:   # RST (порт закрыт) или RST и ACK
+                        return Response.PORT_CLOSED, response_time
+        except socket.timeout:
             return Response.TIMEOUT, 0
 
     def build(self, seq, flags):
