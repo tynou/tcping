@@ -79,6 +79,7 @@ class Ping:
                     elif flags == 0x04 or flags == 0x14:   # RST (порт закрыт) или RST и ACK
                         return Response.PORT_CLOSED, response_time
         except socket.timeout:
+            print("whoopsie")
             return Response.TIMEOUT, 0
 
     def build(self, seq, flags):
