@@ -20,7 +20,7 @@ def get_checksum(data):
 
 
 class Ping:
-    def __init__(self, src_ip, src_port, dst_ip, dst_port, timeout):
+    def __init__(self, src_ip, src_port, dst_ip, dst_port, timeout, debug):
         self.tcp = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP)
 
         self.src_ip = src_ip
@@ -28,6 +28,7 @@ class Ping:
         self.dst_ip = dst_ip
         self.dst_port = dst_port
         self.timeout = timeout
+        self.debug = debug
         self.stats = Stats()
     
     def print_statistics(self):
@@ -38,10 +39,9 @@ class Ping:
         while count:
             code, response_time = self.ping(next(counter))
             self.stats.add(code, response_time)
-            # print(f"Ping {self.dst_ip}:{self.dst_port} | {code} | time={round(response_time * 1000, 3)}ms")
             match code:
                 case Response.PORT_OPEN:
-                    print(f"{self.dst_ip}:{self.dst_port} | Порт отрыт | Ответ получен за {round(response_time * 1000, 3)}мс")
+                    print(f"{self.dst_ip}:{self.dst_port} | Порт открыт | Ответ получен за {round(response_time * 1000, 3)}мс")
                 case Response.PORT_CLOSED:
                     print(f"{self.dst_ip}:{self.dst_port} | Порт закрыт")
                 case Response.TIMEOUT:
@@ -68,23 +68,25 @@ class Ping:
                 response_time = time.time() - start_time
 
                 # Разбор TCP-заголовка
-                tcp_header = struct.unpack('!BBBBIIBB', data[20:34])
-                ack_seq = tcp_header[5]  # Номер подтверждения (ACK)
-                flags = tcp_header[7]    # Флаги TCP
+                tcp_header = struct.unpack('!HHLLBBHHH', data[20:40])
+                ack_seq = tcp_header[3]
+                flags = tcp_header[5]
 
-                if ack_seq == seq + 1:  # Проверка ACK
-                    if flags == 0x12:    # SYN-ACK (порт открыт)
-                        self.tcp.sendto(self.build(seq, 4), (self.dst_ip, self.dst_port))  # RST (закрытие)
+                if ack_seq == seq + 1:
+                    if self.debug:
+                        self.print_packet_info(data[20:40])
+                    
+                    if flags == 0x12: # SYN-ACK (порт открыт)
+                        self.tcp.sendto(self.build(seq, 4), (self.dst_ip, self.dst_port)) # RST (закрытие)
                         return Response.PORT_OPEN, response_time
-                    elif flags == 0x04 or flags == 0x14:   # RST (порт закрыт) или RST и ACK
+                    elif flags == 0x04 or flags == 0x14: # RST (порт закрыт) или RST и ACK
                         return Response.PORT_CLOSED, response_time
         except socket.timeout:
-            print("whoopsie")
             return Response.TIMEOUT, 0
 
     def build(self, seq, flags):
         packet = struct.pack(
-            '!HHIIBBHHH',
+            "!HHIIBBHHH",
             self.src_port,  # Source Port
             self.dst_port,  # Destination Port
             seq,              # SEQ
@@ -97,7 +99,7 @@ class Ping:
         )
 
         header = struct.pack(
-            '!4s4sHH',
+            "!4s4sHH",
             socket.inet_aton(self.src_ip),
             socket.inet_aton(self.dst_ip),
             socket.IPPROTO_TCP,
@@ -105,6 +107,31 @@ class Ping:
         )
 
         checksum = get_checksum(header + packet)
-        packet = packet[:16] + struct.pack('H', checksum) + packet[18:]
+        packet = packet[:16] + struct.pack("H", checksum) + packet[18:]
 
         return packet
+    
+    def print_packet_info(self, packet):
+        (src_port,
+         dst_port,
+         seq_num,
+         ack_num,
+         data_offset_reserved,
+         flags,
+         window_size,
+         checksum, urg_ptr) = struct.unpack('!HHLLBBHHH', packet[:20])
+
+        print("\n[Информация о полученном пакете]")
+        print("┌──────────────────────────┬──────────────┐")
+        print(f"│ {'Исходящий порт':<24} │ {src_port:>12} │")
+        print(f"│ {'Порт назначения':<24} │ {dst_port:>12} │")
+        print("├──────────────────────────┼──────────────┤")
+        print(f"│ {'Номер последовательности':<24} │ {seq_num:>12} │")
+        print(f"│ {'Номер подтверждения':<24} │ {ack_num:>12} │")
+        print("├──────────────────────────┼──────────────┤")
+        print(f"│ {'Смещение данных':<24} │ {data_offset_reserved:>12} │")
+        print(f"│ {'Флаги':<24} │ {hex(flags):>12} │")
+        print(f"│ {'Размер окна':<24} │ {window_size:>12} │")
+        print(f"│ {'Контрольная сумма':<24} │ {hex(checksum):>12} │")
+        print(f"│ {'Указатель срочности':<24} │ {urg_ptr:>12} │")
+        print("└──────────────────────────┴──────────────┘")

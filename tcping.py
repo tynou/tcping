@@ -5,9 +5,9 @@ import sys
 from ping import Ping
 
 
-def get_ip():
+def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 80))
+    s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
 
@@ -15,7 +15,7 @@ def get_free_port():
     for port in range(49152, 65535):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind(('0.0.0.0', port))
+                s.bind(("0.0.0.0", port))
                 return port
             except socket.error:
                 continue
@@ -25,43 +25,39 @@ def get_free_port():
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('host', type=str, help='host to ping')
-    parser.add_argument('-p', '--port', dest='port', type=int, required=False, default=80)
-    parser.add_argument('-c', '--count', dest='count', type=int, required=False, default=float('Inf'))
-    parser.add_argument('-t', '--timeout', dest='timeout', type=float, required=False, default=5.0)
-    parser.add_argument('-i', '--interval', type=float, required=False, default=1.0)
+    parser.add_argument("host", type=str)
+    parser.add_argument("-p", "--port", type=int, required=False, default=80)
+    parser.add_argument("-c", "--count", type=int, required=False, default=float('Inf'))
+    parser.add_argument("-t", "--timeout", type=float, required=False, default=5.0)
+    parser.add_argument("-i", "--interval", type=float, required=False, default=1.0)
+    parser.add_argument("-d", "--debug", required=False, default=False, action="store_true")
 
     args = parser.parse_args()
 
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
 
     try:
         socket.inet_aton(args.host)
-        is_url = False
+        dst_ip = args.host
     except socket.error:
-        is_url = True
-
-    if is_url:
         try:
             dst_ip = socket.gethostbyname(args.host)
         except socket.error:
             print(f"Хоста '{args.host}' не существует")
-            sys.exit()
-    else:
-        dst_ip = args.host
+            sys.exit(1)
     
-    if dst_ip == '127.0.0.1':
-        src_ip = '127.0.0.1'
+    if dst_ip == "127.0.0.1":
+        src_ip = "127.0.0.1"
     else:
-        src_ip = get_ip()
+        src_ip = get_local_ip()
     
     src_port = get_free_port()
 
-    ping = Ping(src_ip, src_port, dst_ip, args.port, args.timeout)
+    ping = Ping(src_ip, src_port, dst_ip, args.port, args.timeout, args.debug)
     try:
         ping.start(args.count, args.interval)
     except KeyboardInterrupt:

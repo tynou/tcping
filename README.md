@@ -14,7 +14,7 @@ sudo python3 tcping.py [host] [-p port] [-c count] [-t timeout] [-i interval]
 - `-c` или `--count`: Количество пингов (по умолчанию - бесконечный пинг)
 - `-t` или `--timeout`: Ожидание ответа в секундах (по умолчанию - 5)
 - `-i` или `--interval`: Интервал между пингами в секундах (по умолчанию - 1)
-### Пример
+### Пример запуска
 ```
 sudo python3 tcping.py anytask.org
 ```

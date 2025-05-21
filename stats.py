@@ -10,10 +10,6 @@ class Stats:
         self.records = []
         self.received = 0
         self.lost = 0
-        # packets sent
-        # packets delivered
-        # packet loss %
-        # min, max, avg response times
 
     def add(self, code, time):
         if time != 0:
@@ -29,7 +25,7 @@ class Stats:
                 f"{self.lost + self.received} пакетов отправлено\n"
                 f"{self.received} пакетов доставлено\n"
                 f"Процент потерь - {self.lost / (self.lost + self.received) * 100:.1f}%\n")
-        
+
         time_stats = ""
         if len(self.records) != 0:
             time_stats = (f"Статистика времени:\n"
@@ -38,4 +34,3 @@ class Stats:
                 f"avg - {avg(*self.records):.1f}ms")
 
         return packet_stats + time_stats
-    
